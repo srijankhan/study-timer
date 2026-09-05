@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timekeeper</title>
+<style>
+  :root{
+    --ink:#12151A;
+    --panel:#1B1F26;
+    --panel-raised:#20242C;
+    --border:#2B303A;
+    --parchment:#EDE7D8;
+    --muted:#8B93A1;
+    --amber:#C9973F;
+    --amber-dim:#7A6435;
+    --teal:#5B8C7B;
+    --teal-dim:#39584D;
+    --blue:#6E8FAE;
+    --blue-dim:#3E5063;
+    --danger:#B5563F;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{
+    margin:0;
+    height:100%;
+    background:var(--ink);
+    color:var(--parchment);
+    font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 16px;
+    min-height:100vh;
+  }
+
+  .app{
+    width:100%;
+    max-width:460px;
+  }
+
+  .wordmark{
+    font-family:Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    font-size:22px;
+    letter-spacing:0.3px;
+    color:var(--parchment);
+    margin:0 0 4px 0;
+  }
+
+  .wordmark span{ color:var(--muted); font-size:14px; font-family:'Segoe UI', sans-serif; }
+
+  .tabs{
+    display:flex;
+    gap:24px;
+    border-bottom:1px solid var(--border);
+    margin:20px 0 28px 0;
+  }
+
+  .tab{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:15px;
+    padding:0 0 12px 0;
+    cursor:pointer;
+    position:relative;
+    font-family:inherit;
+  }
+
+  .tab.active{ color:var(--parchment); }
+
+  .tab.active::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-1px;
+    height:2px;
+    background:var(--accent, var(--amber));
+  }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .ring-wrap{
+    position:relative;
+    width:280px;
+    height:280px;
+    margin:0 auto 28px auto;
+  }
+
+  .ring-wrap svg{ width:100%; height:100%; transform:rotate(-90deg); }
+
+  .ring-track{ fill:none; stroke:var(--border); stroke-width:10; }
+  .ring-progress{
+    fill:none;
+    stroke:var(--accent, var(--amber));
+    stroke-width:10;
+    stroke-linecap:round;
+    transition:stroke-dashoffset 0.25s linear, stroke 0.4s ease;
+  }
+
+  .ring-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+  }
+
+  .time-display{
+    font-family:Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    font-size:52px;
+    font-variant-numeric:tabular-nums;
+    line-height:1;
+    letter-spacing:0.5px;
+  }
+
+  .time-sub{
+    margin-top:8px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .stopwatch-display{
+    text-align:center;
+    margin:24px 0 32px 0;
+  }
+  .stopwatch-display .time-display{ font-size:56px; }
+
+  .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content:center;
+    margin-bottom:24px;
+  }
+
+  .chip{
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--parchment);
+    padding:8px 14px;
+    border-radius:20px;
+    font-size:13px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .chip:hover{ border-color:var(--accent, var(--amber)); }
+  .chip.selected{ border-color:var(--accent, var(--amber)); color:var(--accent, var(--amber)); }
+
+  .custom-set{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin-bottom:24px;
+  }
+  .custom-set input[type=number]{
+    width:64px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--parchment);
+    padding:8px;
+    border-radius:8px;
+    font-size:14px;
+    font-family:inherit;
+    text-align:center;
+  }
+  .custom-set label{ font-size:13px; color:var(--muted); }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-bottom:8px;
+  }
+
+  button.ctl{
+    font-family:inherit;
+    font-size:14px;
+    padding:12px 22px;
+    border-radius:10px;
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--parchment);
+    min-width:96px;
+  }
+
+  button.ctl.primary{
+    background:var(--accent, var(--amber));
+    border-color:var(--accent, var(--amber));
+    color:var(--ink);
+    font-weight:600;
+  }
+
+  button.ctl:disabled{ opacity:0.4; cursor:not-allowed; }
+  button.ctl:hover:not(:disabled){ filter:brightness(1.1); }
+
+  .laps{
+    margin-top:20px;
+    max-height:160px;
+    overflow-y:auto;
+    border-top:1px solid var(--border);
+  }
+  .lap-row{
+    display:flex;
+    justify-content:space-between;
+    padding:10px 4px;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+    font-variant-numeric:tabular-nums;
+  }
+  .lap-row span:first-child{ color:var(--muted); }
+
+  .pomo-config{
+    display:flex;
+    justify-content:center;
+    gap:18px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
+  .pomo-config .field{ text-align:center; }
+  .pomo-config label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .pomo-config input{
+    width:56px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--parchment);
+    padding:6px;
+    border-radius:8px;
+    text-align:center;
+    font-family:inherit;
+    font-size:14px;
+  }
+
+  .dots{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    margin-bottom:20px;
+  }
+  .dot{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--border);
+  }
+  .dot.done{ background:var(--accent, var(--amber)); }
+  .dot.current{ background:var(--accent, var(--amber)); box-shadow:0 0 0 3px var(--panel-raised); }
+
+  .foot-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-top:22px;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .foot-row input{ accent-color:var(--amber); }
+
+  .done-banner{
+    text-align:center;
+    color:var(--danger);
+    font-size:14px;
+    margin-bottom:14px;
+    min-height:20px;
+  }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <p class="wordmark">Timekeeper <span>— no ads, no accounts, works offline</span></p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="timer">Timer</button>
+    <button class="tab" data-tab="stopwatch">Stopwatch</button>
+    <button class="tab" data-tab="pomodoro">Pomodoro</button>
+  </div>
+
+  <!-- TIMER -->
+  <div class="panel active" id="panel-timer">
+    <div class="done-banner" id="timer-banner">&nbsp;</div>
+    <div class="ring-wrap">
+      <svg viewBox="0 0 280 280">
+        <circle class="ring-track" cx="140" cy="140" r="120"></circle>
+        <circle class="ring-progress" id="timer-ring" cx="140" cy="140" r="120"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="time-display" id="timer-display">05:00</div>
+        <div class="time-sub" id="timer-sub">remaining</div>
+      </div>
+    </div>
+
+    <div class="chip-row" id="timer-presets">
+      <button class="chip" data-min="5">5 min</button>
+      <button class="chip selected" data-min="10">10 min</button>
+      <button class="chip" data-min="15">15 min</button>
+      <button class="chip" data-min="25">25 min</button>
+      <button class="chip" data-min="45">45 min</button>
+      <button class="chip" data-min="60">60 min</button>
+    </div>
+
+    <div class="custom-set">
+      <label for="timer-custom">custom</label>
+      <input type="number" id="timer-custom" min="1" max="360" placeholder="min">
+      <button class="chip" id="timer-custom-apply">set</button>
+    </div>
+
+    <div class="controls">
+      <button class="ctl primary" id="timer-start">Start</button>
+      <button class="ctl" id="timer-pause" disabled>Pause</button>
+      <button class="ctl" id="timer-reset">Reset</button>
+    </div>
+  </div>
+
+  <!-- STOPWATCH -->
+  <div class="panel" id="panel-stopwatch">
+    <div class="stopwatch-display">
+      <div class="time-display" id="stopwatch-display">00:00.0</div>
+      <div class="time-sub">elapsed</div>
+    </div>
+    <div class="controls">
+      <button class="ctl primary" id="stopwatch-start">Start</button>
+      <button class="ctl" id="stopwatch-lap" disabled>Lap</button>
+      <button class="ctl" id="stopwatch-reset">Reset</button>
+    </div>
+    <div class="laps" id="stopwatch-laps"></div>
+  </div>
+
+  <!-- POMODORO -->
+  <div class="panel" id="panel-pomodoro">
+    <div class="done-banner" id="pomo-banner">&nbsp;</div>
+    <div class="pomo-config" id="pomo-config">
+      <div class="field">
+        <label>focus (min)</label>
+        <input type="number" id="pomo-work" value="25" min="1" max="120">
+      </div>
+      <div class="field">
+        <label>short break</label>
+        <input type="number" id="pomo-break" value="5" min="1" max="60">
+      </div>
+      <div class="field">
+        <label>long break</label>
+        <input type="number" id="pomo-long" value="15" min="1" max="60">
+      </div>
+      <div class="field">
+        <label>sessions</label>
+        <input type="number" id="pomo-sessions" value="4" min="2" max="8">
+      </div>
+    </div>
+
+    <div class="ring-wrap">
+      <svg viewBox="0 0 280 280">
+        <circle class="ring-track" cx="140" cy="140" r="120"></circle>
+        <circle class="ring-progress" id="pomo-ring" cx="140" cy="140" r="120"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="time-display" id="pomo-display">25:00</div>
+        <div class="time-sub" id="pomo-phase">focus</div>
+      </div>
+    </div>
+
+    <div class="dots" id="pomo-dots"></div>
+
+    <div class="controls">
+      <button class="ctl primary" id="pomo-start">Start</button>
+      <button class="ctl" id="pomo-pause" disabled>Pause</button>
+      <button class="ctl" id="pomo-skip">Skip</button>
+      <button class="ctl" id="pomo-reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="foot-row">
+    <input type="checkbox" id="keep-awake">
+    <label for="keep-awake">keep screen awake while running</label>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- shared audio (no external files, no ads, fully offline) ---------- */
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+  function beep(freq, duration, delay){
+    const ctx = ensureAudio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + delay + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + duration + 0.05);
+  }
+  let alarmInterval = null;
+  function playAlarm(){
+    beep(880, 0.18, 0);
+    beep(880, 0.18, 0.28);
+    alarmInterval = setInterval(function(){
+      beep(880, 0.18, 0);
+      beep(880, 0.18, 0.28);
+    }, 900);
+  }
+  function stopAlarm(){
+    if(alarmInterval){ clearInterval(alarmInterval); alarmInterval = null; }
+  }
+
+  function notify(title, body){
+    if("Notification" in window){
+      if(Notification.permission === "granted"){
+        new Notification(title, {body: body});
+      } else if(Notification.permission !== "denied"){
+        Notification.requestPermission();
+      }
+    }
+  }
+
+  /* ---------- wake lock ---------- */
+  let wakeLock = null;
+  const keepAwakeBox = document.getElementById("keep-awake");
+  async function acquireWakeLock(){
+    try{
+      if("wakeLock" in navigator && keepAwakeBox.checked){
+        wakeLock = await navigator.wakeLock.request("screen");
+      }
+    }catch(e){ /* not supported or denied, silently ignore */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ wakeLock.release().catch(function(){}); wakeLock = null; }
+  }
+
+  /* ---------- tabs ---------- */
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".panel");
+  tabs.forEach(function(tab){
+    tab.addEventListener("click", function(){
+      tabs.forEach(function(t){ t.classList.remove("active"); });
+      panels.forEach(function(p){ p.classList.remove("active"); });
+      tab.classList.add("active");
+      document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+      document.title = "Timekeeper";
+    });
+  });
+
+  const RING_CIRC = 2 * Math.PI * 120;
+
+  function fmt(mm_ss_total_seconds){
+    const m = Math.floor(mm_ss_total_seconds / 60);
+    const s = Math.floor(mm_ss_total_seconds % 60);
+    return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  }
+
+  /* =========================================================
+     TIMER
+     ========================================================= */
+  (function(){
+    const display = document.getElementById("timer-display");
+    const sub = document.getElementById("timer-sub");
+    const ring = document.getElementById("timer-ring");
+    const banner = document.getElementById("timer-banner");
+    const btnStart = document.getElementById("timer-start");
+    const btnPause = document.getElementById("timer-pause");
+    const btnReset = document.getElementById("timer-reset");
+    const presetRow = document.getElementById("timer-presets");
+    const customInput = document.getElementById("timer-custom");
+    const customApply = document.getElementById("timer-custom-apply");
+
+    ring.style.strokeDasharray = RING_CIRC;
+
+    let totalSeconds = 10 * 60;
+    let remaining = totalSeconds;
+    let running = false;
+    let intervalId = null;
+    let lastTick = null;
+
+    function render(){
+      display.textContent = fmt(Math.max(0, remaining));
+      const frac = totalSeconds > 0 ? remaining / totalSeconds : 0;
+      ring.style.strokeDashoffset = RING_CIRC * (1 - frac);
+      if(running) document.title = fmt(Math.max(0,remaining)) + " · Timekeeper";
+    }
+
+    function setDuration(mins){
+      stopAlarm();
+      banner.textContent = "\u00A0";
+      totalSeconds = mins * 60;
+      remaining = totalSeconds;
+      running = false;
+      clearInterval(intervalId);
+      btnStart.disabled = false;
+      btnStart.textContent = "Start";
+      btnPause.disabled = true;
+      sub.textContent = "remaining";
+      render();
+    }
+
+    presetRow.addEventListener("click", function(e){
+      const btn = e.target.closest(".chip");
+      if(!btn) return;
+      presetRow.querySelectorAll(".chip").forEach(function(c){ c.classList.remove("selected"); });
+      btn.classList.add("selected");
+      setDuration(parseInt(btn.dataset.min, 10));
+    });
+
+    customApply.addEventListener("click", function(){
+      const v = parseInt(customInput.value, 10);
+      if(v && v > 0){
+        presetRow.querySelectorAll(".chip").forEach(function(c){ c.classList.remove("selected"); });
+        setDuration(v);
+      }
+    });
+
+    function tick(){
+      const now = Date.now();
+      const elapsed = (now - lastTick) / 1000;
+      lastTick = now;
+      remaining -= elapsed;
+      if(remaining <= 0){
+        remaining = 0;
+        render();
+        finish();
+        return;
+      }
+      render();
+    }
+
+    function finish(){
+      running = false;
+      clearInterval(intervalId);
+      btnStart.disabled = false;
+      btnStart.textContent = "Start";
+      btnPause.disabled = true;
+      banner.textContent = "Time's up";
+      document.title = "Time's up! · Timekeeper";
+      playAlarm();
+      notify("Timekeeper", "Your timer finished.");
+      releaseWakeLock();
+    }
+
+    btnStart.addEventListener("click", function(){
+      stopAlarm();
+      banner.textContent = "\u00A0";
+      if(remaining <= 0) remaining = totalSeconds;
+      running = true;
+      lastTick = Date.now();
+      intervalId = setInterval(tick, 200);
+      btnStart.disabled = true;
+      btnPause.disabled = false;
+      acquireWakeLock();
+    });
+
+    btnPause.addEventListener("click", function(){
+      running = false;
+      clearInterval(intervalId);
+      btnStart.disabled = false;
+      btnStart.textContent = "Resume";
+      btnPause.disabled = true;
+      document.title = "Timekeeper";
+      releaseWakeLock();
+    });
+
+    btnReset.addEventListener("click", function(){
+      setDuration(totalSeconds / 60);
+    });
+
+    render();
+  })();
+
+  /* =========================================================
+     STOPWATCH
+     ========================================================= */
+  (function(){
+    const display = document.getElementById("stopwatch-display");
+    const btnStart = document.getElementById("stopwatch-start");
+    const btnLap = document.getElementById("stopwatch-lap");
+    const btnReset = document.getElementById("stopwatch-reset");
+    const lapsBox = document.getElementById("stopwatch-laps");
+
+    let running = false;
+    let startTime = 0;
+    let accumulated = 0;
+    let intervalId = null;
+    let lapCount = 0;
+    let lastLapTime = 0;
+
+    function fmtStopwatch(ms){
+      const totalTenths = Math.floor(ms / 100);
+      const tenths = totalTenths % 10;
+      const totalSeconds = Math.floor(ms / 1000);
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0") + "." + tenths;
+    }
+
+    function currentElapsed(){
+      return accumulated + (running ? Date.now() - startTime : 0);
+    }
+
+    function render(){
+      const el = currentElapsed();
+      display.textContent = fmtStopwatch(el);
+      if(running) document.title = fmtStopwatch(el) + " · Timekeeper";
+    }
+
+    btnStart.addEventListener("click", function(){
+      if(!running){
+        running = true;
+        startTime = Date.now();
+        intervalId = setInterval(render, 100);
+        btnStart.textContent = "Pause";
+        btnLap.disabled = false;
+        acquireWakeLock();
+      } else {
+        running = false;
+        accumulated += Date.now() - startTime;
+        clearInterval(intervalId);
+        btnStart.textContent = "Resume";
+        btnLap.disabled = true;
+        document.title = "Timekeeper";
+        releaseWakeLock();
+      }
+    });
+
+    btnLap.addEventListener("click", function(){
+      lapCount++;
+      const el = currentElapsed();
+      const split = el - lastLapTime;
+      lastLapTime = el;
+      const row = document.createElement("div");
+      row.className = "lap-row";
+      row.innerHTML = "<span>lap " + lapCount + " · +" + fmtStopwatch(split) + "</span><span>" + fmtStopwatch(el) + "</span>";
+      lapsBox.prepend(row);
+    });
+
+    btnReset.addEventListener("click", function(){
+      running = false;
+      clearInterval(intervalId);
+      accumulated = 0;
+      lapCount = 0;
+      lastLapTime = 0;
+      lapsBox.innerHTML = "";
+      btnStart.textContent = "Start";
+      btnLap.disabled = true;
+      document.title = "Timekeeper";
+      render();
+      releaseWakeLock();
+    });
+
+    render();
+  })();
+
+  /* =========================================================
+     POMODORO
+     ========================================================= */
+  (function(){
+    const display = document.getElementById("pomo-display");
+    const phaseLabel = document.getElementById("pomo-phase");
+    const ring = document.getElementById("pomo-ring");
+    const banner = document.getElementById("pomo-banner");
+    const btnStart = document.getElementById("pomo-start");
+    const btnPause = document.getElementById("pomo-pause");
+    const btnSkip = document.getElementById("pomo-skip");
+    const btnReset = document.getElementById("pomo-reset");
+    const dotsBox = document.getElementById("pomo-dots");
+    const inputWork = document.getElementById("pomo-work");
+    const inputBreak = document.getElementById("pomo-break");
+    const inputLong = document.getElementById("pomo-long");
+    const inputSessions = document.getElementById("pomo-sessions");
+    const configInputs = [inputWork, inputBreak, inputLong, inputSessions];
+
+    ring.style.strokeDasharray = RING_CIRC;
+
+    let sessionIndex = 0; // 0-based count of focus sessions completed
+    let phase = "focus"; // 'focus' | 'break' | 'long'
+    let totalSeconds = parseInt(inputWork.value,10) * 60;
+    let remaining = totalSeconds;
+    let running = false;
+    let intervalId = null;
+    let lastTick = null;
+
+    function totalSessions(){ return parseInt(inputSessions.value,10) || 4; }
+
+    function phaseColor(){
+      if(phase === "focus") return "var(--amber)";
+      if(phase === "long") return "var(--blue)";
+      return "var(--teal)";
+    }
+
+    function renderDots(){
+      dotsBox.innerHTML = "";
+      const n = totalSessions();
+      for(let i=0;i<n;i++){
+        const d = document.createElement("div");
+        d.className = "dot";
+        if(i < sessionIndex) d.classList.add("done");
+        if(i === sessionIndex && phase === "focus") d.classList.add("current");
+        dotsBox.appendChild(d);
+      }
+    }
+
+    function render(){
+      display.textContent = fmt(Math.max(0, remaining));
+      const frac = totalSeconds > 0 ? remaining / totalSeconds : 0;
+      ring.style.strokeDashoffset = RING_CIRC * (1 - frac);
+      ring.style.stroke = phaseColor();
+      phaseLabel.textContent = phase === "focus" ? "focus" : (phase === "long" ? "long break" : "short break");
+      if(running) document.title = fmt(Math.max(0,remaining)) + " · " + phaseLabel.textContent;
+    }
+
+    function phaseSeconds(p){
+      if(p === "focus") return parseInt(inputWork.value,10) * 60;
+      if(p === "long") return parseInt(inputLong.value,10) * 60;
+      return parseInt(inputBreak.value,10) * 60;
+    }
+
+    function setPhase(p, resetIndexIfNeeded){
+      phase = p;
+      totalSeconds = phaseSeconds(p);
+      remaining = totalSeconds;
+      renderDots();
+      render();
+    }
+
+    function advance(){
+      if(phase === "focus"){
+        sessionIndex++;
+        if(sessionIndex >= totalSessions()){
+          setPhase("long");
+        } else {
+          setPhase("break");
+        }
+      } else {
+        if(sessionIndex >= totalSessions()){
+          sessionIndex = 0;
+        }
+        setPhase("focus");
+      }
+    }
+
+    function tick(){
+      const now = Date.now();
+      const elapsed = (now - lastTick) / 1000;
+      lastTick = now;
+      remaining -= elapsed;
+      if(remaining <= 0){
+        remaining = 0;
+        render();
+        finishPhase();
+        return;
+      }
+      render();
+    }
+
+    function finishPhase(){
+      running = false;
+      clearInterval(intervalId);
+      const finishedPhase = phase;
+      banner.textContent = finishedPhase === "focus" ? "Focus session complete — take a break" : "Break's over — back to focus";
+      playAlarm();
+      notify("Timekeeper", banner.textContent);
+      advance();
+      btnStart.disabled = false;
+      btnStart.textContent = "Start";
+      btnPause.disabled = true;
+      releaseWakeLock();
+    }
+
+    btnStart.addEventListener("click", function(){
+      stopAlarm();
+      banner.textContent = "\u00A0";
+      configInputs.forEach(function(i){ i.disabled = true; });
+      running = true;
+      lastTick = Date.now();
+      intervalId = setInterval(tick, 200);
+      btnStart.disabled = true;
+      btnPause.disabled = false;
+      acquireWakeLock();
+    });
+
+    btnPause.addEventListener("click", function(){
+      running = false;
+      clearInterval(intervalId);
+      btnStart.disabled = false;
+      btnStart.textContent = "Resume";
+      btnPause.disabled = true;
+      document.title = "Timekeeper";
+      releaseWakeLock();
+    });
+
+    btnSkip.addEventListener("click", function(){
+      stopAlarm();
+      banner.textContent = "\u00A0";
+      running = false;
+      clearInterval(intervalId);
+      advance();
+      btnStart.disabled = false;
+      btnStart.textContent = "Start";
+      btnPause.disabled = true;
+    });
+
+    btnReset.addEventListener("click", function(){
+      stopAlarm();
+      banner.textContent = "\u00A0";
+      running = false;
+      clearInterval(intervalId);
+      configInputs.forEach(function(i){ i.disabled = false; });
+      sessionIndex = 0;
+      setPhase("focus");
+      btnStart.disabled = false;
+      btnStart.textContent = "Start";
+      btnPause.disabled = true;
+      document.title = "Timekeeper";
+      releaseWakeLock();
+    });
+
+    configInputs.forEach(function(input){
+      input.addEventListener("change", function(){
+        if(!running) setPhase(phase);
+      });
+    });
+
+    renderDots();
+    render();
+  })();
+
+  keepAwakeBox.addEventListener("change", function(){
+    if(!keepAwakeBox.checked) releaseWakeLock();
+  });
+
+})();
+</script>
+
+</body>
+</html>
